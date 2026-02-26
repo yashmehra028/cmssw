@@ -671,14 +671,14 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
     h_SimTrackToSimHitsEnergyFraction_->Fill(energySumSimHits / simClusters[simId].energy());
 
     double energyFracSumSimHits = 0;
-    for (auto hit_energy : simClusters[simId].hits_and_fractions()) {
-      DetId id(hit_energy.first);
+    for (auto hit_fraction : simClusters[simId].hits_and_fractions()) {
+      DetId id(hit_fraction.first);
       auto rechitIt =
           std::find_if(pfRechit.begin(), pfRechit.end(), [id](const reco::PFRecHit& rh) { return rh.detId() == id; });
       if (rechitIt == pfRechit.end()) {
         continue;
       } else {
-        energyFracSumSimHits += rechitIt->energy() * hit_energy.second;
+        energyFracSumSimHits += rechitIt->energy() * hit_fraction.second;
       }
     }
 
@@ -763,12 +763,12 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
                                   << ", with shared energy: " << recoPair.second.first
                                   << ", shared energy fraction: " << recoPair.second.first / energyFracSumSimHits
                                   << ", score: " << recoPair.second.second << ", hits=";
-        for (auto const& hit_energy : recoClusters[recoPair.first.index()].recHitFractions()) {
-          DetId id(hit_energy.recHitRef()->detId());
+        for (auto const& hit_fraction : recoClusters[recoPair.first.index()].recHitFractions()) {
+          DetId id(hit_fraction.recHitRef()->detId());
           const GlobalPoint pos = caloGeom.getPosition(id);
-          edm::LogPrint("PFTester") << "     DetId=" << hit_energy.recHitRef()->detId() << ", eta=" << pos.eta()
-                                    << ", phi=" << pos.phi() << ", en=" << hit_energy.recHitRef()->energy()
-                                    << ", fr=" << hit_energy.fraction();
+          edm::LogPrint("PFTester") << "     DetId=" << hit_fraction.recHitRef()->detId() << ", eta=" << pos.eta()
+                                    << ", phi=" << pos.phi() << ", en=" << hit_fraction.recHitRef()->energy()
+                                    << ", fr=" << hit_fraction.fraction();
         }
 #endif
 
