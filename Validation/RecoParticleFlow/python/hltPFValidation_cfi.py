@@ -1,6 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 
-_filter_sim_hits = cms.vstring("Ecal",)
+_filter_sim_hits_ecal = cms.vstring("Ecal")
+_filter_sim_hits_hcal = cms.vstring("Hcal")
 
 _calo_truth = cms.InputTag("mix", "MergedCaloTruth")
 _calo_truth_premix = cms.InputTag("mixData", "MergedCaloTruth")
@@ -15,7 +16,14 @@ hltPFClusterSimClusterAssociationProducerECAL = cms.EDProducer("PCToSCAssociator
     associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"),
     label_lcl = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
     label_scl = _calo_truth,
-    filter_sim_hits = _filter_sim_hits
+    filter_sim_hits = _filter_sim_hits_ecal
+)
+
+hltPFClusterSimClusterAssociationProducerHCAL = cms.EDProducer("PCToSCAssociatorEDProducer",
+    associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"), # to be fixed
+    label_lcl = cms.InputTag("hltParticleFlowClusterHBHE"),
+    label_scl = _calo_truth,
+    filter_sim_hits = _filter_sim_hits_hcal
 )
 from Configuration.ProcessModifiers.premix_stage2_cff import premix_stage2
 premix_stage2.toModify(hltPFClusterSimClusterAssociationProducerECAL,
@@ -32,7 +40,13 @@ hltPFClusterCaloParticleAssociationProducerECAL = cms.EDProducer("PCToCPAssociat
     associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"),
     label_lc = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
     label_cp = _calo_truth,
-    filter_sim_hits = _filter_sim_hits
+    filter_sim_hits = _filter_sim_hits_ecal
+)
+hltPFClusterCaloParticleAssociationProducerHCAL = cms.EDProducer("PCToCPAssociatorEDProducer",
+    associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"), # to be fixed
+    label_lc = cms.InputTag("hltParticleFlowClusterHBHE"),
+    label_cp = _calo_truth,
+    filter_sim_hits = _filter_sim_hits_hcal
 )
 premix_stage2.toModify(hltPFClusterCaloParticleAssociationProducerECAL,
     label_cp = _calo_truth_premix,
@@ -46,9 +60,9 @@ hltPFClusterTesterECAL = cms.EDProducer("PFClusterTester",
     CaloParticle = _calo_truth,
     ClusterSimClusterAssociator = cms.InputTag("hltPFClusterSimClusterAssociationProducerECAL"),
     ClusterCaloParticleAssociator = cms.InputTag("hltPFClusterCaloParticleAssociationProducerECAL"),
-    filter_sim_hits = _filter_sim_hits,
-    outFolder = cms.string('HLT/ParticleFlow'),
-    assocScoreThresholds = cms.vdouble(1., 0.5, 0.1),
+    filter_sim_hits = _filter_sim_hits_ecal,
+    outFolder = cms.string('HLT/ParticleFlow/ClusterECAL'),
+    assocScoreThresholds = cms.vdouble(1.1, 0.9, 0.5, 0.1),
     doMatchByScore = cms.bool(True),
     enFracCut = cms.double(0.),
     ptCut = cms.double(0.),
@@ -61,14 +75,33 @@ premix_stage2.toModify(hltPFClusterTesterECAL,
     CaloParticle = _calo_truth_premix,
 )
 
+hltPFClusterTesterHCAL = cms.EDProducer("PFClusterTester",
+    PFCand = cms.InputTag("hltParticleFlow"),
+    Rechit = cms.InputTag("hltParticleFlowRecHitHBHE"),
+    RecoCluster = cms.InputTag("hltParticleFlowClusterHBHE"),
+    SimCluster = cms.InputTag("mix","MergedCaloTruth"),
+    CaloParticle = cms.InputTag("mix","MergedCaloTruth"),
+    ClusterSimClusterAssociator = cms.InputTag("hltPFClusterSimClusterAssociationProducerHCAL"),
+    ClusterCaloParticleAssociator = cms.InputTag("hltPFClusterCaloParticleAssociationProducerHCAL"),
+    filter_sim_hits = _filter_sim_hits_hcal,
+    outFolder = cms.string('HLT/ParticleFlow/ClusterHCAL'),
+    assocScoreThresholds = cms.vdouble(1.1, 0.9, 0.5, 0.1),
+    doMatchByScore = cms.bool(True),
+    enFracCut = cms.double(0.),
+    ptCut = cms.double(0.),
+    etaCut = cms.double(3.0),
+)
+from Configuration.Eras.Modifier_phase2_common_cff import phase2_common
+phase2_common.toModify(hltPFClusterTesterHCAL, PFCand = cms.InputTag("hltParticleFlowTmp"), etaCut = cms.double(1.48))
+
 hltDigisTesterECAL = cms.EDProducer("DigisTester",
     ecalEBDigis = cms.InputTag("hltEcalDigis", "ebDigis"),
     ecalEEDigis = cms.InputTag("hltEcalDigis", "eeDigis"),
-    outFolder = cms.string('HLT/ParticleFlow'),
+    outFolder = cms.string('HLT/ParticleFlow/ClusterECAL'),
 )
 
 hltRecHitTesterECAL = cms.EDProducer("RecHitTester",
-    outFolder = cms.string('HLT/ParticleFlow'),
+    outFolder = cms.string('HLT/ParticleFlow/ClusterECAL'),
     ebSimHits = cms.InputTag('g4SimHits', 'EcalHitsEB'),
     eeSimHits = cms.InputTag('g4SimHits', 'EcalHitsEE'),
     ebRecHits = cms.InputTag('hltEcalRecHit', 'EcalRecHitsEB'),
@@ -87,6 +120,10 @@ hltPFClusterTesterECALWithCut = hltPFClusterTesterECAL.clone(
     enFracCut = cms.double(0.01),
     ptCut = cms.double(0.1)
 )
+hltPFClusterTesterHCALWithCut = hltPFClusterTesterHCAL.clone(
+    enFracCut = cms.double(0.01),
+    ptCut = cms.double(0.1)
+)
 
 # SimToReco match based on shared energy fraction
 hltPFClusterTesterECALShEnF = hltPFClusterTesterECAL.clone(
@@ -101,9 +138,12 @@ hltPFClusterTesterECALShEnFWithCut = hltPFClusterTesterECALShEnF.clone(
 PFValSeq = cms.Sequence(
     hltPFScAssocByEnergyScoreProducer
     +hltPFClusterSimClusterAssociationProducerECAL
+    +hltPFClusterSimClusterAssociationProducerHCAL
     +hltPFCpAssocByEnergyScoreProducer
     +hltPFClusterCaloParticleAssociationProducerECAL
+    +hltPFClusterCaloParticleAssociationProducerHCAL
     +hltPFClusterTesterECALWithCut
+    +hltPFClusterTesterHCALWithCut
     +hltPFClusterTesterECALShEnFWithCut
     +hltDigisTesterECAL
     +hltRecHitTesterECAL
