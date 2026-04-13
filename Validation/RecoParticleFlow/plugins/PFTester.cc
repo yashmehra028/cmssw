@@ -22,6 +22,7 @@
 #include "Geometry/CaloGeometry/interface/CaloGeometry.h"
 #include "Geometry/Records/interface/CaloGeometryRecord.h"
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
+#define debug
 
 template <typename RecoClusterCollection>
 class PFTesterT : public DQMEDAnalyzer {
@@ -100,6 +101,7 @@ protected:
   MonitorElement* h_simToRecoScore_EnSimTrack_;
   MonitorElement* h_simToRecoScore_Mult_;
   MonitorElement* h_SimTrackToSimHitsEnergyFraction_;
+	MonitorElement* h_totalRecoDivideSimCluster_;
 
   std::vector<double> assocScoreThresholds_;
   uint nAssocScoreThresholds_;
@@ -347,6 +349,12 @@ void PFTesterT<RecoClusterCollection>::bookHistograms(DQMStore::IBooker& ibook,
                    0,
                    1.1);
 
+	h_totalRecoDivideSimCluster_ = ibook.book2D("totalRecoDivideSimCluster",
+																							"Total Matched Reco Energy / Sim Energy;Sim Energy (GeV);Response",
+																							 100, 0, 200,
+																							 100, 0, 1.5);
+
+
   for (auto& hVar : histoVarsSim) {
     auto [nBins, hMin, hMax] = hVar.second;
     h_simClusters_[hVar.first] =
@@ -522,6 +530,8 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
     minDet = *std::min_element(detIds.begin(), detIds.end());
     maxDet = *std::max_element(detIds.begin(), detIds.end());
   }
+
+	std::cout << minDet << "  MinDet  " << maxDet << std::endl;  
 
   // --------------------------------------------------------------------
   // ---------------- PF Clusters and associators -----------------------
@@ -764,21 +774,23 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
       continue;
 
 #ifdef debug
-	const CaloGeometry& caloGeom = iSetup.getData(geometry_token_);
-	  
-	auto ev = simCluster.g4Tracks()[0].eventId().event();
-	auto bx = simCluster.g4Tracks()[0].eventId().bunchCrossing();
-	edm::LogPrint("PFTester") << "  SimCluster[" << simId << "], ev=" << ev << ", bx=" << bx
-							  << ", en=" << energySumSimHits
-							  << ", nhits=" << hafView.size()
-							  << ", hits=";
-	  
-	for (size_t it = 0; it<hafView.size(); ++it) {
-	  DetId id(hafView[it].first);
-	  const GlobalPoint pos = caloGeom.getPosition(id);
-	  edm::LogPrint("PFTester") << "    DetId=" << hafView[it].first << ", eta=" << pos.eta() << ", phi=" << pos.phi()
-								<< ", en=" << haeView[it].second << ", fr=" << hafView[it].second;
-	}
+    const CaloGeometry& caloGeom = iSetup.getData(geometry_token_);
+
+    auto ev = simCluster.g4Tracks()[0].eventId().event();
+    auto bx = simCluster.g4Tracks()[0].eventId().bunchCrossing();
+    edm::LogPrint("PFTester") << "  SimCluster[" << simId << "], ev=" << ev << ", bx=" << bx
+                              << ", en=" << energySumSimHits << ", nhits=" << hafView.size() << ", hits=";
+
+    for (size_t it = 0; it < hafView.size(); ++it) {
+      DetId id(hafView[it].first);
+      const GlobalPoint pos = caloGeom.getPosition(id);
+	
+			int layerOrDepth = -1;
+			if (id.det() == DetId::Hcal) layerOrDepth = HcalDetId(id).depth();
+
+      edm::LogPrint("PFTester") << "    DetId=" << hafView[it].first << ", eta=" << pos.eta() << ", phi=" << pos.phi()
+                                << ", layer=" << layerOrDepth << ", en=" << haeView[it].second << ", fr=" << hafView[it].second;
+    }
 #endif
 
     for (unsigned ithr = 0; ithr < nAssocScoreThresholds_; ++ithr) {
@@ -790,24 +802,27 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
 #ifdef debug
 		const CaloGeometry& caloGeom = iSetup.getData(geometry_token_);
 
-		if constexpr (std::is_same<RecoClusterCollection, reco::PFClusterCollection>::value) {
-		  edm::LogPrint("PFTester") << "   Matched to RecoCluster[" << recoPair.first.index()
-									<< "], en=" << recoClusters[recoPair.first.index()].energy()
-									<< ", with shared energy: " << recoPair.second.first
-									<< ", shared energy fraction: " << recoPair.second.first / energyFracSumSimHits
-									<< ", score: " << recoPair.second.second
-									<< ", score threshold: " << thresh
-									<< ", nhits: " << recoClusters[recoPair.first.index()].recHitFractions().size()
-									<< ", hits=";
+        if constexpr (std::is_same<RecoClusterCollection, reco::PFClusterCollection>::value) {
+          edm::LogPrint("PFTester") << "   Matched to RecoCluster[" << recoPair.first.index()
+                                    << "], en=" << recoClusters[recoPair.first.index()].energy()
+                                    << ", with shared energy: " << recoPair.second.first
+                                    << ", shared energy fraction: " << recoPair.second.first / recoEnergySumWeightedBySimFrac
+                                    << ", score: " << recoPair.second.second << ", score threshold: " << thresh
+                                    << ", nhits: " << recoClusters[recoPair.first.index()].recHitFractions().size()
+                                    << ", hits=";
 
-		  for (auto const& hit_fraction : recoClusters[recoPair.first.index()].recHitFractions()) {
-			DetId id(hit_fraction.recHitRef()->detId());
-			const GlobalPoint pos = caloGeom.getPosition(id);
-			edm::LogPrint("PFTester") << "     DetId=" << hit_fraction.recHitRef()->detId() << ", eta=" << pos.eta()
-									  << ", phi=" << pos.phi() << ", en=" << hit_fraction.recHitRef()->energy()
-									  << ", fr=" << hit_fraction.fraction();
-		  }
-		}
+          for (auto const& hit_fraction : recoClusters[recoPair.first.index()].recHitFractions()) {
+            DetId id(hit_fraction.recHitRef()->detId());
+            const GlobalPoint pos = caloGeom.getPosition(id);
+					
+						int layerOrDepthReco = -1;
+						if (id.det() == DetId::Hcal) layerOrDepthReco = HcalDetId(id).depth();
+						
+            edm::LogPrint("PFTester") << "     DetId=" << hit_fraction.recHitRef()->detId() << ", eta=" << pos.eta()
+                                      << ", phi=" << pos.phi() <<  ", layer=" << layerOrDepthReco << ", en=" << hit_fraction.recHitRef()->energy()
+                                      << ", fr=" << hit_fraction.fraction();
+          }
+        }
 #endif
 
         auto score = recoPair.second.second;
@@ -1036,14 +1051,16 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
     if (abs(simTrackEtaAtBoundary) > etaCut_)  // simTrack does not cross the barrel
       continue;
 
-	const edm::Ref<SimClusterCollection> simClusterRef(SimCluster, simId);
-	const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
-	if (simToRecoIt == simToRecoAssoc.end())
-	  continue;
-	const auto& simToRecoMatched = simToRecoIt->val;
-	if (simToRecoMatched.empty())
-	  continue;
-	
+    const edm::Ref<SimClusterCollection> simClusterRef(SimCluster, simId);
+    const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
+    if (simToRecoIt == simToRecoAssoc.end())
+      continue;
+    const auto& simToRecoMatched = simToRecoIt->val;
+    if (simToRecoMatched.empty())
+      continue;
+
+		double TotalRecoEnergy = 0;		
+
     // they should already be sorted by score
     std::vector simToRecoMatchedSorted(simToRecoMatched.begin(), simToRecoMatched.end());
     std::sort(simToRecoMatchedSorted.begin(), simToRecoMatchedSorted.end(), [](const auto& a, const auto& b) {
@@ -1057,6 +1074,8 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
       for (const auto& recoPair : simToRecoMatchedSorted) {
         auto recoId = recoPair.first.index();
         const auto& recoCluster = recoClusters[recoId];
+
+				if (ithr == 0) TotalRecoEnergy += recoCluster.energy();
 
         bool passMatch = false;
         if (doMatchByScore_) {
@@ -1081,6 +1100,8 @@ void PFTesterT<RecoClusterCollection>::analyze(const edm::Event& iEvent, const e
         }
       }
     }
+	
+	 h_totalRecoDivideSimCluster_->Fill(energySumSimHits, TotalRecoEnergy / energySumSimHits);
   }
 
   // --------------------------------------------------------------------
