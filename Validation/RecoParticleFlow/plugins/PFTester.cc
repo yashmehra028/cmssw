@@ -22,7 +22,7 @@
 #include "Geometry/CaloGeometry/interface/CaloGeometry.h"
 #include "Geometry/Records/interface/CaloGeometryRecord.h"
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
-#define debug
+//#define debug
 
 template <typename RecoClusterCollection>
 class PFTesterT : public DQMEDAnalyzer {
