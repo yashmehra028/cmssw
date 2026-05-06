@@ -135,13 +135,29 @@ hltPFClusterTesterECALShEnFWithCut = hltPFClusterTesterECALShEnF.clone(
     ptCut = cms.double(0.1)
 )
 
+'''from Validation.RecoParticleFlow.SimClusterCalibrator import SimClusterCalibrator as _SimClusterCalibrator
+simClusterCalibrator = _SimClusterCalibrator.clone(
+    simClusters = cms.InputTag("mix","MergedCaloTruth"),
+    pfRecHits = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
+    pfRecHits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded","hltParticleFlowRecHitHBHE"),
+    pfRecHitMap = cms.InputTag("hltRecHitMapProducer:pfRecHitMap")
+)'''
+
+simClusterCalibrator = cms.EDProducer("SimClusterCalibrator",
+    simClusters = cms.InputTag("mix", "MergedCaloTruth"),
+    # For HCAL Aging, use HBHE. For ECAL, use ECALUnseeded.
+    pfRecHits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded","hltParticleFlowRecHitHBHE"),
+    pfRecHitMap = cms.InputTag("hltRecHitMapProducer:pfRecHitMap")
+)
+
 PFValSeq = cms.Sequence(
+    #simClusterCalibrator
     hltPFScAssocByEnergyScoreProducer
     +hltPFClusterSimClusterAssociationProducerECAL
-    +hltPFClusterSimClusterAssociationProducerHCAL
+    #+hltPFClusterSimClusterAssociationProducerHCAL
     +hltPFCpAssocByEnergyScoreProducer
     +hltPFClusterCaloParticleAssociationProducerECAL
-    +hltPFClusterCaloParticleAssociationProducerHCAL
+    #+hltPFClusterCaloParticleAssociationProducerHCAL
     +hltPFClusterTesterECALWithCut
     +hltPFClusterTesterHCALWithCut
     +hltPFClusterTesterECALShEnFWithCut
